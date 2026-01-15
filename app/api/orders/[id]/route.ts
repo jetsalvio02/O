@@ -10,8 +10,6 @@ export async function GET(
   const { id } = await params;
   const user_id = Number(id);
 
-  console.log(id);
-
   // 🔒 VALIDATION
   if (!id || Number.isNaN(user_id)) {
     return NextResponse.json({ message: "Invalid user id" }, { status: 400 });

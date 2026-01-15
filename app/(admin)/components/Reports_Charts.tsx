@@ -62,6 +62,17 @@ export default function ReportsCharts({ dailyOrders }: { dailyOrders: any[] }) {
               },
             ],
           }}
+          options={{
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  stepSize: 1,
+                  precision: 0,
+                },
+              },
+            },
+          }}
         />
       </div>
     </div>

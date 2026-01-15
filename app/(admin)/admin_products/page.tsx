@@ -25,12 +25,14 @@ export default function AdminProductsPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [loadingProducts, setLoadingProducts] = useState(true);
 
   /* ---------------- FETCH PRODUCTS ---------------- */
   const fetchProducts = async () => {
     const res = await fetch("/api/admin/products");
     const data = await res.json();
     setProducts(data);
+    setLoadingProducts(false);
   };
 
   useEffect(() => {
@@ -150,7 +152,7 @@ export default function AdminProductsPage() {
                 <td className="px-6 py-4 font-medium">{p.name}</td>
                 <td>₱{p.price.toLocaleString("en-Ph")}</td>
                 <td>
-                  {p.stock}
+                  {p.stock}{" "}
                   <span
                     className={`px-2 py-1 rounded text-xs font-medium ${
                       p.stock > 0
@@ -180,7 +182,36 @@ export default function AdminProductsPage() {
               </tr>
             ))}
 
-            {products.length === 0 && (
+            {loadingProducts && (
+              <tr>
+                <td colSpan={5} className="text-center py-6">
+                  <div className="flex justify-center items-center gap-2 text-gray-500">
+                    <svg
+                      className="animate-spin h-5 w-5 text-blue-600"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                      />
+                    </svg>
+                    Loading products...
+                  </div>
+                </td>
+              </tr>
+            )}
+
+            {!loadingProducts && products.length === 0 && (
               <tr>
                 <td colSpan={5} className="text-center py-6 text-gray-500">
                   No products found

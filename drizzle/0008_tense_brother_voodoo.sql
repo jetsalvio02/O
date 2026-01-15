@@ -1,0 +1,1 @@
+ALTER TABLE "orders" ADD COLUMN "phone" varchar(20) NOT NULL;

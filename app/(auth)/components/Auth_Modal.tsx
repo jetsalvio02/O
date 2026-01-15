@@ -48,8 +48,6 @@ export default function AuthModal({ open, onClose }: AuthModalProps) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.message);
 
-        localStorage.setItem("user", JSON.stringify(data.user));
-
         const role = data.user.role?.toUpperCase();
 
         if (role === "ADMIN") {

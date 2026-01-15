@@ -39,7 +39,6 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
       return;
     }
 
-    localStorage.setItem("user", JSON.stringify(data.user));
     onClose();
 
     if (data.user.role === "ADMIN") {

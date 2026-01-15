@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     message: "Login successfully",
     user: {
       id: user.id,
@@ -44,4 +44,19 @@ export async function POST(request: Request) {
       role: user.role,
     },
   });
+
+  response.cookies.set("session_user", JSON.stringify({ id: user.id, role: user.role }), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  });
+  response.cookies.set("user_id", String(user.id), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  });
+
+  return response;
 }

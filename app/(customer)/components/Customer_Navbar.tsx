@@ -1,13 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { ShoppingCart, LogOut, User, Menu, X } from "lucide-react";
+import {
+  ShoppingCart,
+  LogOut,
+  User,
+  Menu,
+  X,
+  ListChecks,
+  ShoppingBasket,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { get_user, logout } from "@/lib/auth";
 import AuthModal from "@/app/(auth)/components/Auth_Modal";
 import Swal from "sweetalert2";
-import { getCartCount } from "@/lib/cart";
 
 export default function CustomerNavbar() {
   const router = useRouter();
@@ -16,14 +23,14 @@ export default function CustomerNavbar() {
   const [cartCount, setCartCount] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const fetchCartCount = async () => {
-    const user = get_user();
-    if (!user?.id) {
+  const fetchCartCount = async (sessionUser?: any) => {
+    const currentUser = sessionUser ?? (await get_user());
+    if (!currentUser?.id) {
       setCartCount(0);
       return;
     }
 
-    const res = await fetch(`/api/cart/count?user_id=${user.id}`);
+    const res = await fetch(`/api/cart/count?user_id=${currentUser.id}`);
     const data = await res.json();
     setCartCount(data.count);
   };
@@ -32,12 +39,16 @@ export default function CustomerNavbar() {
      INIT
   ====================== */
   useEffect(() => {
-    setUser(get_user());
+    const init = async () => {
+      const sessionUser = await get_user();
+      setUser(sessionUser);
+      await fetchCartCount(sessionUser);
+    };
 
-    fetchCartCount();
+    void init();
 
     const handler = () => {
-      fetchCartCount();
+      void fetchCartCount();
     };
 
     window.addEventListener("cart_updated", handler);
@@ -62,9 +73,10 @@ export default function CustomerNavbar() {
 
     if (!result.isConfirmed) return;
 
-    logout();
+    await logout();
     setUser(null);
     setMobileOpen(false);
+    setCartCount(0);
 
     await Swal.fire({
       icon: "success",
@@ -88,8 +100,9 @@ export default function CustomerNavbar() {
       <Link
         href="/products"
         onClick={() => setMobileOpen(false)}
-        className="hover:text-blue-600"
+        className="relative flex items-center gap-1 hover:text-blue-600"
       >
+        <ShoppingBasket size={18} />
         Products
       </Link>
 
@@ -98,15 +111,16 @@ export default function CustomerNavbar() {
           <Link
             href="/my_orders"
             onClick={() => setMobileOpen(false)}
-            className="hover:text-blue-600"
+            className="relative flex items-center gap-1 hover:text-blue-600"
           >
+            <ListChecks size={18} />
             My Orders
           </Link>
 
           <Link
             href="/cart"
             onClick={() => setMobileOpen(false)}
-            className="relative flex items-center gap-1"
+            className="relative flex items-center gap-1 hover:text-blue-600"
           >
             <ShoppingCart size={18} />
             Cart

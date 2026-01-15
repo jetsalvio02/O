@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { type InferModel } from "drizzle-orm";
 import {
+  carts,
+  carts_items,
   orders_items,
   orders as ordersTable,
   product,
@@ -160,36 +163,142 @@ export async function PATCH(request: Request) {
 //     return NextResponse.json({ message: "Order failed" }, { status: 500 });
 //   }
 // }
+// export async function POST(req: Request) {
+//   try {
+//     const { user_id, items } = await req.json();
+
+//     if (!user_id || !items?.length) {
+//       return NextResponse.json(
+//         { message: "Invalid order data" },
+//         { status: 400 }
+//       );
+//     }
+
+//     // 1. Load user address
+//     const [user] = await database
+//       .select()
+//       .from(users)
+//       .where(eq(users.id, user_id));
+
+//     if (!user?.address || !user?.phone) {
+//       return NextResponse.json({ message: "Address not set" }, { status: 400 });
+//     }
+
+//     // 2. Load products
+//     const productIds = items.map((i: any) => i.productId);
+
+//     const dbProducts = await database
+//       .select()
+//       .from(product)
+//       .where(inArray(product.id, productIds));
+
+//     // 3. Validate stock
+//     for (const item of items) {
+//       const p = dbProducts.find((p) => p.id === item.productId);
+//       if (!p || p.stock < item.quantity) {
+//         return NextResponse.json(
+//           { message: `Insufficient stock for ${item.productId}` },
+//           { status: 400 }
+//         );
+//       }
+//     }
+
+//     type OrderInsert = InferModel<typeof ordersTable, "insert">;
+
+//     const orderData: OrderInsert = {
+//       user_id: user_id,
+//       address: user.address,
+//       phone: user.phone,
+//       status: "PENDING",
+//       total: items.reduce(
+//         (sum: number, i: any) => sum + i.price * i.quantity,
+//         0
+//       ),
+//     };
+
+//     // 4. TRANSACTION (THIS IS CRITICAL)
+//     const result = await database.transaction(async (tx) => {
+//       // create order
+//       const [order] = await tx
+//         .insert(ordersTable)
+//         .values(orderData)
+//         .returning();
+
+//       // create order items
+//       await tx.insert(orders_items).values(
+//         items.map((i: any) => ({
+//           order_id: order.id,
+//           product_id: i.productId,
+//           quantity: i.quantity,
+//           price: i.price,
+//         }))
+//       );
+
+//       // update stock
+//       for (const item of items) {
+//         await tx
+//           .update(product)
+//           .set({
+//             stock: sql`${product.stock} - ${item.quantity}`,
+//           })
+//           .where(eq(product.id, item.productId));
+//       }
+
+//       // 🔥 DELETE CART ITEMS (THIS FIXES YOUR ISSUE)
+//       await tx.delete(carts).where(
+//         inArray(
+//           carts.id,
+//           items.map((i: any) => i.cartItemId)
+//         )
+//       );
+
+//       return order;
+//     });
+
+//     return NextResponse.json(result);
+//   } catch (error) {
+//     console.error(error);
+//     return NextResponse.json({ message: "Order failed" }, { status: 500 });
+//   }
+// }
+
 export async function POST(req: Request) {
   try {
     const { user_id, items } = await req.json();
 
-    if (!user_id || !items || items.length === 0) {
+    if (!user_id || !items?.length) {
       return NextResponse.json(
         { message: "Invalid order data" },
         { status: 400 }
       );
     }
 
-    /* 1. FETCH PRODUCTS */
-    const productIds = items.map((i: any) => i.productId);
+    // 1. Load user address and phone
+    const [user] = await database
+      .select()
+      .from(users)
+      .where(eq(users.id, user_id));
 
+    if (!user?.address || !user?.phone) {
+      return NextResponse.json({ message: "Address not set" }, { status: 400 });
+    }
+
+    // 2. Load products
+    const productIds = items.map((i: any) => i.productId);
     const dbProducts = await database
       .select()
       .from(product)
       .where(inArray(product.id, productIds));
 
-    /* 2. STOCK VALIDATION */
+    // 3. Validate stock
     for (const item of items) {
       const p = dbProducts.find((p) => p.id === item.productId);
-
       if (!p) {
         return NextResponse.json(
-          { message: "Product not found" },
+          { message: `Product ${item.productId} not found` },
           { status: 404 }
         );
       }
-
       if (p.stock < item.quantity) {
         return NextResponse.json(
           { message: `Insufficient stock for ${p.name}` },
@@ -198,11 +307,13 @@ export async function POST(req: Request) {
       }
     }
 
-    /* 3. CREATE ORDER */
+    // 4. Create order
     const [order] = await database
       .insert(ordersTable)
       .values({
-        user_id,
+        user_id: user.id,
+        address: user.address,
+        phone: user.phone,
         status: "PENDING",
         total: items.reduce(
           (sum: number, i: any) => sum + i.price * i.quantity,
@@ -211,28 +322,35 @@ export async function POST(req: Request) {
       })
       .returning();
 
-    /* 4. CREATE ORDER ITEMS (NO PRICE COLUMN) */
+    // 5. Insert order items
     await database.insert(orders_items).values(
       items.map((i: any) => ({
         order_id: order.id,
         product_id: i.productId,
         quantity: i.quantity,
+        price: i.price,
       }))
     );
 
-    /* 5. UPDATE STOCK */
+    // 6. Deduct stock
     for (const item of items) {
       await database
         .update(product)
-        .set({
-          stock: sql`${product.stock} - ${item.quantity}`,
-        })
+        .set({ stock: sql`${product.stock} - ${item.quantity}` })
         .where(eq(product.id, item.productId));
     }
 
+    // 7. Delete cart items
+    await database.delete(carts_items).where(
+      inArray(
+        carts_items.id,
+        items.map((i: any) => i.cartItemId)
+      )
+    );
+
     return NextResponse.json(order);
   } catch (error) {
-    console.error(error);
+    console.error("Checkout error:", error);
     return NextResponse.json({ message: "Order failed" }, { status: 500 });
   }
 }

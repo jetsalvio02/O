@@ -3,17 +3,49 @@
 import { useEffect, useState } from "react";
 import DashboardCharts from "../components/Dashboard_Charts";
 
+type DashboardData = {
+  kpis: {
+    total_orders: number;
+    pending_orders: number;
+    completed_orders: number;
+    total_sales: number;
+  };
+  charts: {
+    monthly_orders: any[];
+    status_distribution: any[];
+  };
+};
+
 export default function AdminDashboardPage() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/admin/dashboard")
-      .then((res) => res.json())
-      .then((result) => setData(result));
+    const loadDashboard = async () => {
+      try {
+        const res = await fetch("/api/admin/dashboard", {
+          cache: "no-store",
+        });
+        const result = await res.json();
+        setData(result);
+      } catch (err) {
+        console.error("Failed to load dashboard", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboard();
   }, []);
 
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
+
   if (!data) {
-    return <p>Loading dashboard...</p>;
+    return (
+      <p className="text-center text-red-500">Failed to load dashboard data</p>
+    );
   }
 
   const { kpis, charts } = data;
@@ -45,7 +77,7 @@ export default function AdminDashboardPage() {
         />
         <DashboardCard
           title="Total Sales"
-          value={`₱${kpis.total_sales}`}
+          value={`₱${kpis.total_sales.toLocaleString()}`}
           color="purple"
         />
       </div>
@@ -55,41 +87,11 @@ export default function AdminDashboardPage() {
         monthlyOrders={charts.monthly_orders}
         statusDistribution={charts.status_distribution}
       />
-
-      {/* RECENT ORDERS (STATIC FOR NOW – OK) */}
-      <div className="bg-white rounded-lg shadow p-5">
-        <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
-
-        <table className="w-full text-sm">
-          <thead className="border-b text-gray-600">
-            <tr>
-              <th className="text-left py-2">Order ID</th>
-              <th className="text-left">Customer</th>
-              <th className="text-left">Status</th>
-              <th className="text-left">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b">
-              <td className="py-3">#1001</td>
-              <td>Juan Dela Cruz</td>
-              <td className="text-yellow-600 font-medium">Pending</td>
-              <td>₱500</td>
-            </tr>
-            <tr className="border-b">
-              <td className="py-3">#1002</td>
-              <td>Maria Santos</td>
-              <td className="text-green-600 font-medium">Completed</td>
-              <td>₱320</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
     </>
   );
 }
 
-/* KPI CARD COMPONENT */
+/* ---------------- KPI CARD ---------------- */
 function DashboardCard({
   title,
   value,
@@ -111,5 +113,34 @@ function DashboardCard({
       <p className="text-sm text-gray-500 mb-1">{title}</p>
       <p className={`text-2xl font-bold ${colors[color]}`}>{value}</p>
     </div>
+  );
+}
+
+/* ---------------- SKELETON LOADER ---------------- */
+function DashboardSkeleton() {
+  return (
+    <>
+      {/* Title */}
+      <div className="mb-6 space-y-2">
+        <div className="h-6 w-40 bg-gray-200 rounded animate-pulse" />
+        <div className="h-4 w-64 bg-gray-200 rounded animate-pulse" />
+      </div>
+
+      {/* KPI Skeletons */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="bg-white rounded-lg shadow p-5 space-y-3">
+            <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+            <div className="h-8 w-32 bg-gray-200 rounded animate-pulse" />
+          </div>
+        ))}
+      </div>
+
+      {/* Chart Skeleton */}
+      <div className="bg-white rounded-lg shadow p-5">
+        <div className="h-5 w-40 bg-gray-200 rounded animate-pulse mb-4" />
+        <div className="h-64 bg-gray-200 rounded animate-pulse" />
+      </div>
+    </>
   );
 }

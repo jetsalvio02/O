@@ -2,7 +2,9 @@
 
 import axios from "axios";
 import { numeric } from "drizzle-orm/pg-core";
+import { Logs } from "lucide-react";
 import { useEffect, useState } from "react";
+import Swal from "sweetalert2";
 
 export default function My_Orders_Page() {
   const [orders, set_orders] = useState<any[]>([]);
@@ -13,10 +15,21 @@ export default function My_Orders_Page() {
 
   /* ---------------- LOAD USER ---------------- */
   useEffect(() => {
-    const stored_user = localStorage.getItem("user");
-    if (stored_user) {
-      set_user(JSON.parse(stored_user));
-    }
+    const loadUser = async () => {
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
+        if (!res.ok) {
+          set_user(null);
+          return;
+        }
+        const data = await res.json();
+        set_user(data);
+      } catch {
+        set_user(null);
+      }
+    };
+
+    void loadUser();
   }, []);
 
   /* ---------------- FETCH ORDERS ---------------- */
@@ -35,21 +48,47 @@ export default function My_Orders_Page() {
   useEffect(() => {
     if (!user?.id) return;
     fetchOrders(user.id);
-  }, [user]);
+  }, [user?.id]);
 
   /* ---------------- CANCEL ORDER ---------------- */
   const cancelOrder = async (orderId: number) => {
-    const confirm = window.confirm(
-      "Are you sure you want to cancel this order?"
-    );
-    if (!confirm) return;
+    const result = await Swal.fire({
+      title: "Cancel order?",
+      text: "Are you sure you want to cancel this order?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Yes, cancel it",
+      cancelButtonText: "No, keep it",
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
-      await axios.delete(`/api/orders/${orderId}`);
+      await axios.patch("/api/orders", {
+        order_id: orderId,
+        status: "CANCELLED",
+      });
+
+      await Swal.fire({
+        title: "Order cancelled",
+        text: "Your order has been successfully cancelled.",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+
       fetchOrders(user.id);
       setSelectedOrder(null);
     } catch (err) {
       console.error("Failed to cancel order", err);
+
+      await Swal.fire({
+        title: "Error",
+        text: "Failed to cancel the order. Please try again.",
+        icon: "error",
+      });
     }
   };
 
@@ -74,7 +113,10 @@ export default function My_Orders_Page() {
 
   return (
     <>
-      <h2 className="text-2xl font-bold mb-4">My Orders</h2>
+      <h2 className="flex items-center gap-2 text-2xl font-bold mb-4">
+        <Logs />
+        <span>My Orders</span>
+      </h2>
 
       {/* ---------------- STATUS FILTER ---------------- */}
       <div className="flex mb-6">
@@ -97,7 +139,7 @@ export default function My_Orders_Page() {
       )}
 
       {/* ---------------- ORDER LIST ---------------- */}
-      {filteredOrders.map((order) => (
+      {[...filteredOrders].reverse().map((order) => (
         <div
           key={order.id}
           onClick={() => setSelectedOrder(order)}

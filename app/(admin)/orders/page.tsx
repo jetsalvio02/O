@@ -1,6 +1,8 @@
 "use client";
 
+import { Trash } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import Swal from "sweetalert2";
 
 type Order_Status = "PENDING" | "PROCESSING" | "COMPLETED" | "CANCELLED";
 
@@ -8,7 +10,12 @@ type Order_Item = {
   id: number;
   quantity: number;
   price: number;
-  product: { id: number; name: string; price: number; image?: string | null };
+  product: {
+    id: number;
+    name: string;
+    price: number;
+    image?: string | null;
+  };
 };
 
 type Order = {
@@ -16,43 +23,49 @@ type Order = {
   status: Order_Status;
   total: number;
   created_at: string;
-  user: { id: number; name: string; email: string };
+
+  address: string;
+  phone: string;
+
+  user: {
+    id: number;
+    name: string;
+    email: string;
+  };
+
   items: Order_Item[];
 };
 
 const stats_badge_class: Record<Order_Status, string> = {
-  PENDING: "bg-yellow-100 text-yellow-700 boarder-yellow-200",
-  PROCESSING: "bg-blue-100 text-blue-700 boarder-blue-200",
-  COMPLETED: "bg-green-100 text-green-700 boarder-green-200",
-  CANCELLED: "bg-red-100 text-red-700 boarder-red-200",
+  PENDING: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  PROCESSING: "bg-blue-100 text-blue-700 border-blue-200",
+  COMPLETED: "bg-green-100 text-green-700 border-green-200",
+  CANCELLED: "bg-red-100 text-red-700 border-red-200",
 };
 
 export default function Admin_Order_Page() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string>("");
+  const [err, setErr] = useState("");
 
-  // filters
   const [statusFilter, setStatusFilter] = useState<Order_Status | "ALL">("ALL");
   const [search, setSearch] = useState("");
 
-  // modal
   const [selected, setSelected] = useState<Order | null>(null);
 
-  // UX: optimistic status update
   const [savingId, setSavingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
-        setErr("");
         const res = await fetch("/api/orders", { cache: "no-store" });
         const data = await res.json();
-        if (!res.ok) throw new Error(data?.message || "Failed to load orders");
+        if (!res.ok) throw new Error(data?.message);
         setOrders(data);
       } catch (e: any) {
-        setErr(e?.message || "Something went wrong");
+        setErr(e?.message || "Failed to load orders");
       } finally {
         setLoading(false);
       }
@@ -65,17 +78,19 @@ export default function Admin_Order_Page() {
     return orders.filter((o) => {
       const matchStatus =
         statusFilter === "ALL" ? true : o.status === statusFilter;
+
       const matchSearch =
         !s ||
         String(o.id).includes(s) ||
         o.user.name.toLowerCase().includes(s) ||
-        o.user.email.toLowerCase().includes(s);
+        o.user.email.toLowerCase().includes(s) ||
+        o.phone.includes(s);
+
       return matchStatus && matchSearch;
     });
   }, [orders, statusFilter, search]);
 
   const updateStatus = async (orderId: number, newStatus: Order_Status) => {
-    // optimistic update
     const prev = orders;
     setOrders((cur) =>
       cur.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
@@ -86,44 +101,87 @@ export default function Admin_Order_Page() {
       const res = await fetch("/api/admin/status", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, status: newStatus }),
+        body: JSON.stringify({ order_id: orderId, status: newStatus }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.message || "Failed to update status");
-    } catch (e: any) {
-      // rollback on error
+      if (!res.ok) throw new Error("Failed to update status");
+    } catch {
       setOrders(prev);
-      alert(e?.message || "Failed to update status");
+      alert("Failed to update status");
     } finally {
       setSavingId(null);
+    }
+  };
+
+  const deleteOrder = async (orderId: number) => {
+    const result = await Swal.fire({
+      title: "Delete order?",
+      text: "Are you sure you want to permanently delete this order?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, delete it",
+      cancelButtonText: "Cancel",
+    });
+
+    if (!result.isConfirmed) return;
+
+    const prev = orders;
+    setDeletingId(orderId);
+    setOrders((cur) => cur.filter((o) => o.id !== orderId));
+
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) throw new Error("Failed to delete order");
+
+      await Swal.fire({
+        title: "Deleted!",
+        text: "The order has been deleted.",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch {
+      setOrders(prev);
+
+      await Swal.fire({
+        title: "Error",
+        text: "Failed to delete order.",
+        icon: "error",
+      });
+    } finally {
+      setDeletingId(null);
     }
   };
 
   return (
     <div>
       {/* Header */}
-      <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div className="mb-6 flex justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">Orders</h2>
+          <h2 className="text-2xl font-bold">Orders</h2>
           <p className="text-sm text-gray-500">
             Monitor and process customer orders
           </p>
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex gap-2">
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by order ID, name, email..."
-            className="h-10 w-full sm:w-72 rounded-lg border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Search order, name, email, phone..."
+            className="h-10 w-72 rounded-lg border px-3 text-sm"
           />
 
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="h-10 rounded-lg border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            className="h-10 rounded-lg border px-3 text-sm"
           >
-            <option value="ALL">All Status</option>
+            <option value="ALL">All</option>
             <option value="PENDING">Pending</option>
             <option value="PROCESSING">Processing</option>
             <option value="COMPLETED">Completed</option>
@@ -132,185 +190,85 @@ export default function Admin_Order_Page() {
         </div>
       </div>
 
-      {/* States */}
-      {loading && (
-        <div className="bg-white rounded-lg shadow p-6 text-sm text-gray-500">
-          Loading orders...
-        </div>
-      )}
-
-      {!loading && err && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-red-600 font-medium">Error</p>
-          <p className="text-sm text-gray-600 mt-1">{err}</p>
-        </div>
-      )}
-
-      {!loading && !err && filtered.length === 0 && (
-        <div className="bg-white rounded-lg shadow p-6 text-sm text-gray-500">
-          No orders found.
-        </div>
-      )}
-
-      {/* Table */}
-      {!loading && !err && filtered.length > 0 && (
+      {!loading && filtered.length > 0 && (
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b text-gray-600">
-                <tr>
-                  <th className="text-left py-3 px-4">Order</th>
-                  <th className="text-left py-3 px-4">Customer</th>
-                  <th className="text-left py-3 px-4">Date</th>
-                  <th className="text-left py-3 px-4">Total</th>
-                  <th className="text-left py-3 px-4">Status</th>
-                  <th className="text-right py-3 px-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((o) => (
-                  <tr
-                    key={o.id}
-                    className="border-b last:border-b-0 hover:bg-gray-50"
-                  >
-                    <td className="py-3 px-4 font-medium text-gray-800">
-                      #{o.id}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="font-medium text-gray-800">
-                        {o.user.name}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {o.user.email}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-gray-600">
-                      {new Date(o.created_at).toLocaleString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </td>
-                    <td className="py-3 px-4 font-medium text-gray-800">
-                      ₱{o.total}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${
-                          stats_badge_class[o.status]
-                        }`}
-                      >
-                        {o.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => setSelected(o)}
-                          className="rounded-lg border px-3 py-2 text-xs font-medium hover:bg-gray-50"
-                        >
-                          View
-                        </button>
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="text-left p-4">Order</th>
+                <th className="text-left p-4">Customer</th>
+                <th className="text-left p-4">Delivery</th>
+                <th className="text-left p-4">Total</th>
+                <th className="text-left p-4">Status</th>
+                <th className="text-right p-4">Actions</th>
+              </tr>
+            </thead>
 
-                        <select
-                          value={o.status}
-                          disabled={savingId === o.id}
-                          onChange={(e) =>
-                            updateStatus(o.id, e.target.value as Order_Status)
-                          }
-                          className="rounded-lg border bg-white px-2 py-2 text-xs outline-none disabled:opacity-60"
-                          title="Update status"
-                        >
-                          <option value="PENDING">Pending</option>
-                          <option value="PROCESSING">Processing</option>
-                          <option value="COMPLETED">Completed</option>
-                          <option value="CANCELLED">Cancelled</option>
-                        </select>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+            <tbody>
+              {filtered.map((o) => (
+                <tr key={o.id} className="border-b hover:bg-gray-50">
+                  <td className="p-4 font-medium">#{o.id}</td>
 
-      {/* View Modal */}
-      {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-2xl rounded-xl bg-white shadow-lg">
-            <div className="flex items-start justify-between border-b p-5">
-              <div>
-                <h3 className="text-lg font-semibold">Order #{selected.id}</h3>
-                <p className="text-xs text-gray-500 mt-1">
-                  {new Date(selected.created_at).toLocaleString()}
-                </p>
-              </div>
-              <button
-                onClick={() => setSelected(null)}
-                className="rounded-lg border px-3 py-2 text-sm hover:bg-gray-50"
-              >
-                Close
-              </button>
-            </div>
+                  <td className="p-4">
+                    <div className="font-medium">{o.user.name}</div>
+                    <div className="text-xs text-gray-500">{o.user.email}</div>
+                  </td>
 
-            <div className="p-5 space-y-4">
-              {/* Customer */}
-              <div className="rounded-lg bg-gray-50 p-4">
-                <p className="text-xs text-gray-500">Customer</p>
-                <p className="font-semibold text-gray-800">
-                  {selected.user.name}
-                </p>
-                <p className="text-sm text-gray-600">{selected.user.email}</p>
-              </div>
-
-              {/* Items */}
-              <div>
-                <h4 className="font-semibold mb-2">Items</h4>
-                <div className="space-y-2">
-                  {selected.items.map((it) => (
-                    <div
-                      key={it.id}
-                      className="flex items-center gap-4 rounded-lg border p-3"
-                    >
-                      {/* Product Image */}
-                      <img
-                        src={it.product.image || "/placeholder.png"}
-                        alt={it.product.name}
-                        className="h-14 w-14 rounded-lg object-cover border"
-                      />
-
-                      {/* Product Info */}
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-800">
-                          {it.product.name}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Qty: {it.quantity} • Price: ₱{Number(it.price)}
-                        </p>
-                      </div>
-
-                      {/* Item Total */}
-                      <p className="font-semibold text-gray-800">
-                        ₱{Number(it.price) * it.quantity}
-                      </p>
+                  <td className="p-4">
+                    <div className="text-xs">{o.phone}</div>
+                    <div className="text-xs text-gray-500 line-clamp-2">
+                      {o.address}
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </td>
 
-              {/* Footer */}
-              <div className="flex items-center justify-between border-t pt-4">
-                <span className="text-sm text-gray-600">Total</span>
-                <span className="text-lg font-bold text-gray-800">
-                  ₱{selected.total}
-                </span>
-              </div>
-            </div>
-          </div>
+                  <td className="p-4 font-medium">₱{o.total}</td>
+
+                  <td className="p-4">
+                    <span
+                      className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
+                        stats_badge_class[o.status]
+                      }`}
+                    >
+                      {o.status}
+                    </span>
+                  </td>
+
+                  <td className="p-4 text-right">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => setSelected(o)}
+                        className="border rounded-lg px-3 py-2 text-xs"
+                      >
+                        View
+                      </button>
+
+                      <select
+                        value={o.status}
+                        disabled={savingId === o.id}
+                        onChange={(e) =>
+                          updateStatus(o.id, e.target.value as Order_Status)
+                        }
+                        className="border rounded-lg px-2 py-2 text-xs"
+                      >
+                        <option value="PENDING">Pending</option>
+                        <option value="PROCESSING">Processing</option>
+                        <option value="COMPLETED">Completed</option>
+                        <option value="CANCELLED">Cancelled</option>
+                      </select>
+
+                      <button
+                        disabled={deletingId === o.id}
+                        onClick={() => deleteOrder(o.id)}
+                        className="rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                      >
+                        <Trash />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

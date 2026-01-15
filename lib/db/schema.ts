@@ -30,6 +30,9 @@ export const users = pgTable("users", {
 
   role: role_enum("role").default("CUSTOMER"),
 
+  address: varchar("address", { length: 500 }),
+  phone: varchar("phone", { length: 20 }),
+
   created_at: timestamp("created_at").defaultNow(),
 });
 
@@ -62,6 +65,8 @@ export const orders = pgTable("orders", {
 
   address: varchar("address", { length: 500 }).notNull().default(""),
 
+  phone: varchar("phone", { length: 20 }).notNull(),
+
   created_at: timestamp("created_at").defaultNow(),
 });
 
@@ -77,6 +82,8 @@ export const orders_items = pgTable("orders_items", {
     .references(() => product.id),
 
   quantity: integer("quantity").notNull(),
+
+  price: real("price").notNull(),
 });
 
 export const carts = pgTable("carts", {

@@ -43,6 +43,27 @@
       "when": 1766504207120,
       "tag": "0005_simple_hemingway",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1767620236392,
+      "tag": "0006_faulty_pyro",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1767661726091,
+      "tag": "0007_rich_true_believers",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1767662212751,
+      "tag": "0008_tense_brother_voodoo",
+      "breakpoints": true
     }
   ]
 }

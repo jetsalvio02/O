@@ -29,10 +29,8 @@ export default function LoginPage() {
     if (!response.ok) {
       set_error(data.message);
       set_loading(false);
+      return;
     }
-
-    // TEMP (later replace with session/JWT)
-    localStorage.setItem("user", JSON.stringify(data.user));
 
     if (data.user.role === "ADMIN") {
       router.push("/dashboard");
