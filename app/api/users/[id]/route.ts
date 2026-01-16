@@ -1,15 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { database } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const userId = Number(params.id);
+  const { id } = await params;
+  const userId = Number(id);
 
-  // 🔒 Validation
   if (Number.isNaN(userId)) {
     return NextResponse.json({ message: "Invalid user id" }, { status: 400 });
   }
