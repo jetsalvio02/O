@@ -5,20 +5,13 @@ import { NextResponse } from "next/server";
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const user_id = Number(params.id);
-
-  // const { id } = await params;
-  // const user_id = Number(id);
+  const { id } = await params;
+  const user_id = Number(id);
 
   // 🔒 VALIDATION
-  // if (!id || Number.isNaN(user_id)) {
-  //   return NextResponse.json({ message: "Invalid user id" }, { status: 400 });
-  // }
-
-  // 🔒 VALIDATION
-  if (!params.id || Number.isNaN(user_id)) {
+  if (!id || Number.isNaN(user_id)) {
     return NextResponse.json({ message: "Invalid user id" }, { status: 400 });
   }
 
