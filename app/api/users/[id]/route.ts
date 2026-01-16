@@ -1,14 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { database } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  _request: Request,
+  context: { params: { id: string } }
 ) {
-  const { id } = await params;
-  const userId = Number(id);
+  const userId = Number(context.params.id);
 
   if (Number.isNaN(userId)) {
     return NextResponse.json({ message: "Invalid user id" }, { status: 400 });
@@ -24,7 +23,7 @@ export async function GET(
     .where(eq(users.id, userId))
     .limit(1);
 
-  if (!user.length) {
+  if (user.length === 0) {
     return NextResponse.json({ message: "User not found" }, { status: 404 });
   }
 
