@@ -3,12 +3,14 @@ import { database } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
-export async function GET(req: Request, context: { params: { id: string } }) {
-  const { id } = await context.params;
+export async function GET(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  const userId = Number(params.id);
 
-  const userId = Number(id);
-
-  if (isNaN(userId)) {
+  // 🔒 Validation
+  if (Number.isNaN(userId)) {
     return NextResponse.json({ message: "Invalid user id" }, { status: 400 });
   }
 
