@@ -1,13 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { database } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function GET(
-  _request: Request,
-  context: { params: { id: string } }
+  _request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
-  const userId = Number(context.params.id);
+  const userId = Number((await context.params).id);
 
   if (Number.isNaN(userId)) {
     return NextResponse.json({ message: "Invalid user id" }, { status: 400 });
