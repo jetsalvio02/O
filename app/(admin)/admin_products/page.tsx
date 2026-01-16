@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Swal from "sweetalert2";
 
 type Product = {
@@ -26,6 +26,7 @@ export default function AdminProductsPage() {
   const [loading, setLoading] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [loadingProducts, setLoadingProducts] = useState(true);
+  const [search, setSearch] = useState("");
 
   /* ---------------- FETCH PRODUCTS ---------------- */
   const fetchProducts = async () => {
@@ -113,6 +114,14 @@ export default function AdminProductsPage() {
     fetchProducts();
   };
 
+  /* ---------------- FILTERED PRODUCTS ---------------- */
+  const filteredProducts = useMemo(() => {
+    if (!search) return products;
+    return products.filter((p) =>
+      p.name.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [search, products]);
+
   return (
     <>
       {/* HEADER */}
@@ -134,6 +143,17 @@ export default function AdminProductsPage() {
         </button>
       </div>
 
+      {/* SEARCH */}
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Search products..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full md:w-1/3 border rounded-lg px-3 py-2"
+        />
+      </div>
+
       {/* TABLE */}
       <div className="bg-white rounded-xl shadow">
         <table className="w-full text-sm">
@@ -147,7 +167,7 @@ export default function AdminProductsPage() {
             </tr>
           </thead>
           <tbody>
-            {products.map((p) => (
+            {filteredProducts.map((p) => (
               <tr key={p.id} className="border-b hover:bg-gray-50 transition">
                 <td className="px-6 py-4 font-medium">{p.name}</td>
                 <td>₱{p.price.toLocaleString("en-Ph")}</td>
@@ -211,7 +231,7 @@ export default function AdminProductsPage() {
               </tr>
             )}
 
-            {!loadingProducts && products.length === 0 && (
+            {!loadingProducts && filteredProducts.length === 0 && (
               <tr>
                 <td colSpan={5} className="text-center py-6 text-gray-500">
                   No products found
@@ -300,7 +320,7 @@ export default function AdminProductsPage() {
             </div>
 
             {/* MODAL ACTIONS */}
-            <div className="flex justify-between">
+            <div className="flex justify-between mt-6">
               <div className="flex justify-center">
                 {editing.id !== 0 && (
                   <button
@@ -311,31 +331,24 @@ export default function AdminProductsPage() {
                   </button>
                 )}
               </div>
-              <div
-                className="flex justify-end
-                 items-center mt-6"
-              >
-                <div className="flex justify-end">
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => {
-                        setEditing(null);
-                        setImageFile(null);
-                        setPreviewImage(null);
-                      }}
-                      className="px-4 py-2 border rounded-lg"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      disabled={loading}
-                      onClick={saveProduct}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {loading ? "Saving..." : "Save"}
-                    </button>
-                  </div>
-                </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setEditing(null);
+                    setImageFile(null);
+                    setPreviewImage(null);
+                  }}
+                  className="px-4 py-2 border rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={loading}
+                  onClick={saveProduct}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {loading ? "Saving..." : "Save"}
+                </button>
               </div>
             </div>
           </div>
